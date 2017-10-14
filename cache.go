@@ -1,17 +1,17 @@
 package cache
 
 import (
-	"time"
-	"sync"
+	"encoding/gob"
 	"fmt"
 	"io"
-	"encoding/gob"
 	"os"
+	"sync"
+	"time"
 )
 
 type Item struct {
-	Object interface{} //真正的数据项
-	Expiration int64   //生存时间
+	Object     interface{} //真正的数据项
+	Expiration int64       //生存时间
 }
 
 //判断数据项是否过期
@@ -33,10 +33,10 @@ const (
 //缓存系统结构
 type Cache struct {
 	defaultExpiration time.Duration
-	items map[string]Item    //缓存数据项存储在map中
-	mu sync.RWMutex          //读写锁
-	gcInterval time.Duration //过期数据项清理周期
-	stopGc chan bool
+	items             map[string]Item //缓存数据项存储在map中
+	mu                sync.RWMutex    //读写锁
+	gcInterval        time.Duration   //过期数据项清理周期
+	stopGc            chan bool
 }
 
 //过期缓存数据项清理
@@ -44,9 +44,9 @@ func (c *Cache) gcLoop() {
 	ticker := time.NewTicker(c.gcInterval)
 	for {
 		select {
-		case <- ticker.C:
+		case <-ticker.C:
 			c.DeleteExpired()
-		case <- c.stopGc:
+		case <-c.stopGc:
 			ticker.Stop()
 			return
 		}
@@ -83,8 +83,8 @@ func (c *Cache) Set(k string, v interface{}, d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.items[k] = Item{
-		Object:v,
-		Expiration:e,
+		Object:     v,
+		Expiration: e,
 	}
 }
 
@@ -98,8 +98,8 @@ func (c *Cache) set(k string, v interface{}, d time.Duration) {
 		e = time.Now().Add(d).UnixNano()
 	}
 	c.items[k] = Item{
-		Object:v,
-		Expiration:e,
+		Object:     v,
+		Expiration: e,
 	}
 }
 
@@ -163,12 +163,11 @@ func (c *Cache) Delete(k string) {
 	c.mu.Unlock()
 }
 
-
 //将缓存数据项写入到io.writer中
 func (c *Cache) Save(w io.Writer) (err error) {
 	enc := gob.NewEncoder(w)
 	defer func() {
-		if x:= recover(); x != nil {
+		if x := recover(); x != nil {
 			err = fmt.Errorf("Error registering item types with Gob library")
 		}
 	}()
@@ -247,10 +246,10 @@ func (c *Cache) StopGc() {
 //创建一个缓存系统
 func NewCache(defaultExpiration, gcInterval time.Duration) *Cache {
 	c := &Cache{
-		defaultExpiration:defaultExpiration,
-		gcInterval:gcInterval,
-		items:map[string]Item{},
-		stopGc:make(chan bool),
+		defaultExpiration: defaultExpiration,
+		gcInterval:        gcInterval,
+		items:             map[string]Item{},
+		stopGc:            make(chan bool),
 	}
 	//开始启动过期清理 goroutine
 	go c.gcLoop()
